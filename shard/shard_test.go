@@ -58,13 +58,26 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, v := range vectors {
 		t.Run(v.Name, func(t *testing.T) {
-			b, err := shard.Encode(v.Data)
+			b, err := shard.EncodeBlock(v.Data)
 			require.NoError(t, err)
 
-			s, err := shard.Decode(b)
+			s, err := shard.Decode(b.Bytes())
 			require.NoError(t, err)
 
 			require.Equal(t, v.Data, s)
 		})
 	}
+}
+
+func TestEncodeDecodeRoot(t *testing.T) {
+	r := shard.NewRoot([]shard.Entry{
+		shard.NewEntry("test", shard.NewValue(testutil.RandomLink(t), nil)),
+	})
+	b, err := shard.Encode(r)
+	require.NoError(t, err)
+
+	s, err := shard.DecodeRoot(b)
+	require.NoError(t, err)
+
+	require.Equal(t, r, s)
 }
