@@ -2,6 +2,7 @@ package pail
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -12,16 +13,16 @@ import (
 
 // Del deletes the value for the given key from the bucket. If the key is not
 // found, [ErrNotFound] is returned as the error value.
-func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) (ipld.Link, ShardDiff, error) {
+func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) (ipld.Link, shard.Diff, error) {
 	shards := shard.NewFetcher(blocks)
 	rshard, err := shards.GetRoot(ctx, root)
 	if err != nil {
-		return nil, ShardDiff{}, err
+		return nil, shard.Diff{}, err
 	}
 
 	path, err := traverse(ctx, shards, shard.AsBlock(rshard), key)
 	if err != nil {
-		return nil, ShardDiff{}, fmt.Errorf("traversing shard: %w", err)
+		return nil, shard.Diff{}, fmt.Errorf("traversing shard: %w", err)
 	}
 	target := path[len(path)-1]
 	skey := key[len(target.Value().Prefix()):]
@@ -30,13 +31,13 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 		return e.Key() == skey
 	})
 	if entryidx == -1 {
-		return nil, ShardDiff{}, ErrNotFound
+		return nil, shard.Diff{}, ErrNotFound
 	}
 
 	entry := target.Value().Entries()[entryidx]
 	// cannot delete a shard (without data)
 	if entry.Value().Value() == nil {
-		return nil, ShardDiff{}, ErrNotFound
+		return nil, shard.Diff{}, ErrNotFound
 	}
 
 	var additions []shard.BlockView
@@ -47,11 +48,20 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 		// remove the value from this link+value
 		ents := target.Value().Entries()[:]
 		ents[entryidx] = shard.NewEntry(entry.Key(), shard.NewValue(nil, entry.Value().Shard()))
-		nshard = shard.New(target.Value().Prefix(), ents)
+		if target.Value().Prefix() == "" {
+			nshard = shard.NewRoot(ents)
+		} else {
+			nshard = shard.New(target.Value().Prefix(), ents)
+		}
 	} else {
 		ents := slices.Delete(target.Value().Entries()[:], entryidx, entryidx+1)
-		nshard = shard.New(target.Value().Prefix(), ents)
+		if target.Value().Prefix() == "" {
+			nshard = shard.NewRoot(ents)
+		} else {
+			nshard = shard.New(target.Value().Prefix(), ents)
+		}
 
+		// if now empty, remove from parent
 		for i := len(path) - 1; i > 0; i-- {
 			if len(nshard.Entries()) > 0 {
 				break
@@ -60,20 +70,31 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 			child := path[i]
 			parent := path[i-1]
 
-			ents := parent.Value().Entries()[:]
-			nshard = shard.New(parent.Value().Prefix(), slices.DeleteFunc(ents, func(e shard.Entry) bool {
-				if e.Value().Shard() == nil {
-					return false
-				}
-				// FIXME: what if there is a value in this entry?
-				return e.Value().Shard().String() == child.Link().String()
-			}))
+			entidx := slices.IndexFunc(parent.Value().Entries(), func(e shard.Entry) bool {
+				return e.Value().Shard() != nil && e.Value().Shard().String() == child.Link().String()
+			})
+			if entidx == -1 { // should not happen!
+				return nil, shard.Diff{}, errors.New("did not find child shard link in parent")
+			}
+
+			// delete the parent entry, unless it has a value also, then just clear
+			// the shard link.
+			var ents []shard.Entry
+			if parent.Value().Entries()[entidx].Value().Value() != nil {
+				ents = parent.Value().Entries()[:]
+				ents[entidx] = shard.NewEntry(ents[entidx].Key(), shard.NewValue(ents[entidx].Value().Value(), nil))
+			} else {
+				ents = slices.Delete(parent.Value().Entries()[:], entidx, 1)
+			}
+
+			nshard = shard.New(parent.Value().Prefix(), ents)
+			path = path[:i] // pop the parent from the path, they no longer exist
 		}
 	}
 
 	child, err := shard.EncodeBlock(nshard)
 	if err != nil {
-		return nil, ShardDiff{}, err
+		return nil, shard.Diff{}, err
 	}
 	additions = append(additions, child)
 
@@ -86,7 +107,7 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 		for i, e := range entries {
 			if e.Key() == key {
 				if e.Value().Shard() == nil {
-					return nil, ShardDiff{}, fmt.Errorf("\"%s\" is not a shard link in: %s", key, parent.Link().String())
+					return nil, shard.Diff{}, fmt.Errorf("\"%s\" is not a shard link in: %s", key, parent.Link().String())
 				}
 				entries[i] = shard.NewEntry(key, shard.NewValue(e.Value().Value(), child.Link()))
 				break
@@ -102,10 +123,10 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 
 		child, err = shard.EncodeBlock(cshard)
 		if err != nil {
-			return nil, ShardDiff{}, err
+			return nil, shard.Diff{}, err
 		}
 		additions = append(additions, child)
 	}
 
-	return additions[len(additions)-1].Link(), ShardDiff{additions, removals}, nil
+	return additions[len(additions)-1].Link(), shard.Diff{Additions: additions, Removals: removals}, nil
 }

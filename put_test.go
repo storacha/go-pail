@@ -53,14 +53,7 @@ func TestPut(t *testing.T) {
 		r1, diff0, err := Put(ctx, bs, r0, k0, v0)
 		require.NoError(t, err)
 
-		for _, b := range diff0.Additions {
-			err = bs.Put(ctx, b)
-			require.NoError(t, err)
-		}
-		for _, b := range diff0.Removals {
-			err = bs.Del(ctx, b.Link())
-			require.NoError(t, err)
-		}
+		testutil.ApplyDiff(t, diff0, bs)
 
 		r2, diff1, err := Put(ctx, bs, r1, k0, v0)
 		require.NoError(t, err)
@@ -280,14 +273,7 @@ func putAll(t *testing.T, bs testutil.Blockstore, root ipld.Link, objects []obje
 	for _, o := range objects {
 		r, diff, err := Put(ctx, bs, root, o.key, o.value)
 		require.NoError(t, err)
-		for _, b := range diff.Additions {
-			err = bs.Put(ctx, b)
-			require.NoError(t, err)
-		}
-		for _, b := range diff.Removals {
-			err = bs.Del(ctx, b.Link())
-			require.NoError(t, err)
-		}
+		testutil.ApplyDiff(t, diff, bs)
 		root = r
 	}
 	return root

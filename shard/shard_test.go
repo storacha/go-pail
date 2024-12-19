@@ -1,51 +1,52 @@
-package shard
+package shard_test
 
 import (
 	"testing"
 
 	"github.com/storacha/go-pail/internal/testutil"
+	"github.com/storacha/go-pail/shard"
 	"github.com/stretchr/testify/require"
 )
 
 func TestEncodeDecode(t *testing.T) {
 	vectors := []struct {
 		Name string
-		Data Shard
+		Data shard.Shard
 	}{
 		{
 			Name: "no entries",
-			Data: New("", nil),
+			Data: shard.New("", nil),
 		},
 		{
 			Name: "prefix",
-			Data: New("foo/bar", nil),
+			Data: shard.New("foo/bar", nil),
 		},
 		{
 			Name: "value entry",
-			Data: New(
+			Data: shard.New(
 				"",
-				[]Entry{
-					NewEntry("test", NewValue(testutil.RandomLink(t), nil)),
+				[]shard.Entry{
+					shard.NewEntry("test", shard.NewValue(testutil.RandomLink(t), nil)),
 				},
 			),
 		},
 		{
 			Name: "shard entry",
-			Data: New(
+			Data: shard.New(
 				"",
-				[]Entry{
-					NewEntry("test", NewValue(nil, testutil.RandomLink(t))),
+				[]shard.Entry{
+					shard.NewEntry("test", shard.NewValue(nil, testutil.RandomLink(t))),
 				},
 			),
 		},
 		{
 			Name: "shard and value entry",
-			Data: New(
+			Data: shard.New(
 				"",
-				[]Entry{
-					NewEntry(
+				[]shard.Entry{
+					shard.NewEntry(
 						"test",
-						NewValue(
+						shard.NewValue(
 							testutil.RandomLink(t),
 							testutil.RandomLink(t),
 						),
@@ -57,10 +58,10 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, v := range vectors {
 		t.Run(v.Name, func(t *testing.T) {
-			b, err := Encode(v.Data)
+			b, err := shard.Encode(v.Data)
 			require.NoError(t, err)
 
-			s, err := Decode(b)
+			s, err := shard.Decode(b)
 			require.NoError(t, err)
 
 			require.Equal(t, v.Data, s)

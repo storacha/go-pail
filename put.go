@@ -12,33 +12,28 @@ import (
 	"github.com/storacha/go-pail/shard"
 )
 
-type ShardDiff struct {
-	Additions []shard.BlockView
-	Removals  []shard.BlockView
-}
-
 // Put a value (a CID) for the given key. If the key exists it's value is
 // overwritten.
-func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, value ipld.Link) (ipld.Link, ShardDiff, error) {
+func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, value ipld.Link) (ipld.Link, shard.Diff, error) {
 	shards := shard.NewFetcher(blocks)
 	rshard, err := shards.GetRoot(ctx, root)
 	if err != nil {
-		return nil, ShardDiff{}, err
+		return nil, shard.Diff{}, err
 	}
 
 	if rshard.Value().KeyChars() != shard.KeyCharsASCII {
-		return nil, ShardDiff{}, fmt.Errorf("unsupported key character set: %s", rshard.Value().KeyChars())
+		return nil, shard.Diff{}, fmt.Errorf("unsupported key character set: %s", rshard.Value().KeyChars())
 	}
 	if !shard.IsPrintableASCII(key) {
-		return nil, ShardDiff{}, errors.New("key contains non-ASCII characters")
+		return nil, shard.Diff{}, errors.New("key contains non-ASCII characters")
 	}
 	if int64(len(key)) > rshard.Value().MaxKeySize() {
-		return nil, ShardDiff{}, fmt.Errorf("UTF-8 encoded key exceeds max size of %d bytes", rshard.Value().MaxKeySize())
+		return nil, shard.Diff{}, fmt.Errorf("UTF-8 encoded key exceeds max size of %d bytes", rshard.Value().MaxKeySize())
 	}
 
 	path, err := traverse(ctx, shards, shard.AsBlock(rshard), key)
 	if err != nil {
-		return nil, ShardDiff{}, fmt.Errorf("traversing shard: %w", err)
+		return nil, shard.Diff{}, fmt.Errorf("traversing shard: %w", err)
 	}
 	target := path[len(path)-1]
 	skey := key[len(target.Value().Prefix()):]
@@ -93,7 +88,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 
 			child, err := shard.EncodeBlock(shard.New(target.Value().Prefix()+common, entries))
 			if err != nil {
-				return nil, ShardDiff{}, err
+				return nil, shard.Diff{}, err
 			}
 			additions = append(additions, child)
 
@@ -110,7 +105,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 				// common prefix, then existing value needs to persist in this parent
 				if i == len(commonChars)-1 && common == k {
 					if v.Shard() != nil {
-						return nil, ShardDiff{}, errors.New("found a shard link when expecting a value")
+						return nil, shard.Diff{}, errors.New("found a shard link when expecting a value")
 					}
 					parentValue = shard.NewValue(v.Value(), child.Link())
 				} else if i == len(commonChars)-1 && common == skey {
@@ -126,7 +121,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 					),
 				)
 				if err != nil {
-					return nil, ShardDiff{}, err
+					return nil, shard.Diff{}, err
 				}
 				additions = append(additions, parent)
 				child = parent
@@ -156,12 +151,12 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 
 	child, err := shard.EncodeBlock(nshard)
 	if err != nil {
-		return nil, ShardDiff{}, err
+		return nil, shard.Diff{}, err
 	}
 
 	// if no change in the target then we're done
 	if child.Link().String() == target.Link().String() {
-		return root, ShardDiff{}, nil
+		return root, shard.Diff{}, nil
 	}
 
 	additions = append(additions, child)
@@ -175,7 +170,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 		for i, e := range entries {
 			if e.Key() == key {
 				if e.Value().Shard() == nil {
-					return nil, ShardDiff{}, fmt.Errorf("\"%s\" is not a shard link in: %s", key, parent.Link().String())
+					return nil, shard.Diff{}, fmt.Errorf("\"%s\" is not a shard link in: %s", key, parent.Link().String())
 				}
 				entries[i] = shard.NewEntry(key, shard.NewValue(e.Value().Value(), child.Link()))
 				break
@@ -191,10 +186,10 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 
 		child, err = shard.EncodeBlock(cshard)
 		if err != nil {
-			return nil, ShardDiff{}, err
+			return nil, shard.Diff{}, err
 		}
 		additions = append(additions, child)
 	}
 
-	return additions[len(additions)-1].Link(), ShardDiff{additions, path}, nil
+	return additions[len(additions)-1].Link(), shard.Diff{Additions: additions, Removals: path}, nil
 }

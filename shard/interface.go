@@ -11,3 +11,8 @@ type BlockView interface {
 type RootBlockView interface {
 	block.BlockView[RootShard]
 }
+
+type Diff struct {
+	Additions []BlockView
+	Removals  []BlockView
+}
