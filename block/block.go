@@ -21,7 +21,7 @@ func (b block) Bytes() []byte {
 	return b.bytes
 }
 
-func NewBlock(link ipld.Link, bytes []byte) Block {
+func New(link ipld.Link, bytes []byte) Block {
 	return block{link, bytes}
 }
 
