@@ -14,7 +14,7 @@ func TestGet(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("get from root shard", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -43,7 +43,7 @@ func TestGet(t *testing.T) {
 	})
 
 	t.Run("get from shard", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -87,7 +87,7 @@ func TestGet(t *testing.T) {
 	})
 
 	t.Run("get from shard link", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -131,7 +131,7 @@ func TestGet(t *testing.T) {
 	})
 
 	t.Run("not found", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()

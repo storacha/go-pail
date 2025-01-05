@@ -15,7 +15,7 @@ func TestPut(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("put to empty shard", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -39,7 +39,7 @@ func TestPut(t *testing.T) {
 	})
 
 	t.Run("put same value to existing key", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -63,7 +63,7 @@ func TestPut(t *testing.T) {
 	})
 
 	t.Run("auto-shards on similar key", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -103,7 +103,7 @@ func TestPut(t *testing.T) {
 	})
 
 	t.Run("put to shard link", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -170,7 +170,7 @@ func TestPut(t *testing.T) {
 		}
 
 		for _, order := range orders {
-			rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+			rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 			require.NoError(t, err)
 
 			bs := testutil.NewBlockstore()

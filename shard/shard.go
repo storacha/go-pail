@@ -126,7 +126,8 @@ func NewRoot(entries []Entry) RootShard {
 
 const Version = 2
 
-func Encode(s Shard) ([]byte, error) {
+// Marshal serializes a [Shard] or a [RootShard] to CBOR encoded bytes.
+func Marshal(s Shard) ([]byte, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 
@@ -185,7 +186,7 @@ func Encode(s Shard) ([]byte, error) {
 	}
 
 	for _, ent := range s.Entries() {
-		n, err := encodeEntryNode(ent)
+		n, err := unwrapEntry(ent)
 		if err != nil {
 			return nil, fmt.Errorf("encoding entry node: %w", err)
 		}
@@ -219,7 +220,7 @@ func Encode(s Shard) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func encodeEntryNode(e Entry) (datamodel.Node, error) {
+func unwrapEntry(e Entry) (datamodel.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 	la, err := nb.BeginList(2)
@@ -230,7 +231,7 @@ func encodeEntryNode(e Entry) (datamodel.Node, error) {
 	if err != nil {
 		return nil, fmt.Errorf("assembling entry key: %w", err)
 	}
-	vn, err := encodeValueNode(e.Value())
+	vn, err := unwrapValue(e.Value())
 	if err != nil {
 		return nil, fmt.Errorf("encoding entry value: %w", err)
 	}
@@ -245,7 +246,7 @@ func encodeEntryNode(e Entry) (datamodel.Node, error) {
 	return nb.Build(), nil
 }
 
-func encodeValueNode(v Value) (datamodel.Node, error) {
+func unwrapValue(v Value) (datamodel.Node, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 
@@ -278,10 +279,12 @@ func encodeValueNode(v Value) (datamodel.Node, error) {
 	return nb.Build(), nil
 }
 
-func EncodeBlock[S Shard](s S) (block.BlockView[S], error) {
-	bytes, err := Encode(s)
+// MarshalBlock serializes the [Shard] to CBOR encoded bytes, takes the sha2-256
+// hash of the data, constructs a CID and returns a [block.Block].
+func MarshalBlock[S Shard](s S) (block.BlockView[S], error) {
+	bytes, err := Marshal(s)
 	if err != nil {
-		return nil, fmt.Errorf("encoding shard: %w", err)
+		return nil, fmt.Errorf("marshalling shard: %w", err)
 	}
 	digest, err := multihash.Sum(bytes, multihash.SHA2_256, -1)
 	if err != nil {
@@ -291,7 +294,8 @@ func EncodeBlock[S Shard](s S) (block.BlockView[S], error) {
 	return block.NewBlockView(link, bytes, s), nil
 }
 
-func Decode(b []byte) (Shard, error) {
+// Unmarshal deserializes CBOR encoded bytes to a [Shard].
+func Unmarshal(b []byte) (Shard, error) {
 	var s shard
 
 	np := basicnode.Prototype.Map
@@ -328,7 +332,7 @@ func Decode(b []byte) (Shard, error) {
 		if err != nil {
 			return nil, fmt.Errorf("iterating entries: %w", err)
 		}
-		ent, err := decodeEntryNode(n)
+		ent, err := wrapEntry(n)
 		if err != nil {
 			return nil, fmt.Errorf("decoding entry node: %w", err)
 		}
@@ -338,7 +342,8 @@ func Decode(b []byte) (Shard, error) {
 	return s, nil
 }
 
-func DecodeRoot(b []byte) (RootShard, error) {
+// UnmarshalRoot deserializes CBOR encoded bytes to a [RootShard].
+func UnmarshalRoot(b []byte) (RootShard, error) {
 	var rs rootshard
 
 	np := basicnode.Prototype.Map
@@ -408,7 +413,7 @@ func DecodeRoot(b []byte) (RootShard, error) {
 		if err != nil {
 			return nil, fmt.Errorf("iterating entries: %w", err)
 		}
-		ent, err := decodeEntryNode(n)
+		ent, err := wrapEntry(n)
 		if err != nil {
 			return nil, fmt.Errorf("decoding entry node: %w", err)
 		}
@@ -418,7 +423,7 @@ func DecodeRoot(b []byte) (RootShard, error) {
 	return rs, nil
 }
 
-func decodeEntryNode(n datamodel.Node) (Entry, error) {
+func wrapEntry(n datamodel.Node) (Entry, error) {
 	kn, err := n.LookupByIndex(0)
 	if err != nil {
 		return nil, fmt.Errorf("looking up key: %w", err)
@@ -431,14 +436,14 @@ func decodeEntryNode(n datamodel.Node) (Entry, error) {
 	if err != nil {
 		return nil, fmt.Errorf("looking up value: %w", err)
 	}
-	value, err := decodeValueNode(vn)
+	value, err := wrapValue(vn)
 	if err != nil {
 		return nil, fmt.Errorf("decoding value node: %w", err)
 	}
 	return entry{key, value}, nil
 }
 
-func decodeValueNode(n datamodel.Node) (Value, error) {
+func wrapValue(n datamodel.Node) (Value, error) {
 	l, err := n.AsLink()
 	if err == nil {
 		return value{nil, l}, nil

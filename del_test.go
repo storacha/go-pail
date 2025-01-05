@@ -13,7 +13,7 @@ func TestDel(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("del from root shard", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -43,7 +43,7 @@ func TestDel(t *testing.T) {
 	})
 
 	t.Run("del from shard", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -117,7 +117,7 @@ func TestDel(t *testing.T) {
 	})
 
 	t.Run("del from shard link", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -195,7 +195,7 @@ func TestDel(t *testing.T) {
 	})
 
 	t.Run("del from shard link in root shard", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -247,7 +247,7 @@ func TestDel(t *testing.T) {
 	})
 
 	t.Run("del from shard does not remove shard link value", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -310,7 +310,7 @@ func TestDel(t *testing.T) {
 	})
 
 	t.Run("del from shard does not remove shard link value 2", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()

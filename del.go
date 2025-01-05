@@ -92,7 +92,7 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 		}
 	}
 
-	child, err := shard.EncodeBlock(nshard)
+	child, err := shard.MarshalBlock(nshard)
 	if err != nil {
 		return nil, shard.Diff{}, err
 	}
@@ -121,7 +121,7 @@ func Del(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string) 
 			cshard = shard.New(parent.Value().Prefix(), entries)
 		}
 
-		child, err = shard.EncodeBlock(cshard)
+		child, err = shard.MarshalBlock(cshard)
 		if err != nil {
 			return nil, shard.Diff{}, err
 		}

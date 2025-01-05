@@ -95,7 +95,9 @@ func Entries(ctx context.Context, blocks block.Fetcher, root ipld.Link, opts ...
 							(hasKeyUpperBoundRangeExclusive && key < o.lt) ||
 							(hasKeyUpperBoundRangeInclusive && key <= o.lte) ||
 							(!hasKeyPrefix && !hasKeyRange) {
-							yield(Entry{key, entry.Value().Value()}, nil)
+							if !yield(Entry{key, entry.Value().Value()}, nil) {
+								return
+							}
 						}
 					}
 

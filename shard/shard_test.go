@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestEncodeDecode(t *testing.T) {
+func TestMarshalUnmarshal(t *testing.T) {
 	vectors := []struct {
 		Name string
 		Data shard.Shard
@@ -58,10 +58,10 @@ func TestEncodeDecode(t *testing.T) {
 
 	for _, v := range vectors {
 		t.Run(v.Name, func(t *testing.T) {
-			b, err := shard.EncodeBlock(v.Data)
+			b, err := shard.MarshalBlock(v.Data)
 			require.NoError(t, err)
 
-			s, err := shard.Decode(b.Bytes())
+			s, err := shard.Unmarshal(b.Bytes())
 			require.NoError(t, err)
 
 			require.Equal(t, v.Data, s)
@@ -69,14 +69,14 @@ func TestEncodeDecode(t *testing.T) {
 	}
 }
 
-func TestEncodeDecodeRoot(t *testing.T) {
+func TestMarshalUnmarshalRoot(t *testing.T) {
 	r := shard.NewRoot([]shard.Entry{
 		shard.NewEntry("test", shard.NewValue(testutil.RandomLink(t), nil)),
 	})
-	b, err := shard.Encode(r)
+	b, err := shard.Marshal(r)
 	require.NoError(t, err)
 
-	s, err := shard.DecodeRoot(b)
+	s, err := shard.UnmarshalRoot(b)
 	require.NoError(t, err)
 
 	require.Equal(t, r, s)

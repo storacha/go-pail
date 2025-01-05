@@ -86,7 +86,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 				entries = shard.PutEntry(entries, shard.NewEntry(k[len(common):], v))
 			}
 
-			child, err := shard.EncodeBlock(shard.New(target.Value().Prefix()+common, entries))
+			child, err := shard.MarshalBlock(shard.New(target.Value().Prefix()+common, entries))
 			if err != nil {
 				return nil, shard.Diff{}, err
 			}
@@ -114,7 +114,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 					parentValue = shard.NewValue(nil, child.Link())
 				}
 
-				parent, err := shard.EncodeBlock(
+				parent, err := shard.MarshalBlock(
 					shard.New(
 						parentPrefix,
 						[]shard.Entry{shard.NewEntry(commonChars[i], parentValue)},
@@ -149,7 +149,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 		nshard = shard.New(target.Value().Prefix(), shard.PutEntry(targetEntries, entry))
 	}
 
-	child, err := shard.EncodeBlock(nshard)
+	child, err := shard.MarshalBlock(nshard)
 	if err != nil {
 		return nil, shard.Diff{}, err
 	}
@@ -184,7 +184,7 @@ func Put(ctx context.Context, blocks block.Fetcher, root ipld.Link, key string, 
 			cshard = shard.New(parent.Value().Prefix(), entries)
 		}
 
-		child, err = shard.EncodeBlock(cshard)
+		child, err = shard.MarshalBlock(cshard)
 		if err != nil {
 			return nil, shard.Diff{}, err
 		}

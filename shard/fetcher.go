@@ -17,7 +17,7 @@ func (f *Fetcher) Get(ctx context.Context, link ipld.Link) (BlockView, error) {
 		return nil, err
 	}
 
-	s, err := Decode(b.Bytes())
+	s, err := Unmarshal(b.Bytes())
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (f *Fetcher) GetRoot(ctx context.Context, link ipld.Link) (RootBlockView, e
 		return nil, err
 	}
 
-	rs, err := DecodeRoot(b.Bytes())
+	rs, err := UnmarshalRoot(b.Bytes())
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,7 @@ func TestEntries(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("lists entries in lexicographical order", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -47,7 +47,7 @@ func TestEntries(t *testing.T) {
 	})
 
 	t.Run("lists entries by prefix", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -86,7 +86,7 @@ func TestEntries(t *testing.T) {
 	})
 
 	t.Run("lists entries by key greater than", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -125,7 +125,7 @@ func TestEntries(t *testing.T) {
 	})
 
 	t.Run("lists entries by key greater than or equal", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -164,7 +164,7 @@ func TestEntries(t *testing.T) {
 	})
 
 	t.Run("lists entries by key less than", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -203,7 +203,7 @@ func TestEntries(t *testing.T) {
 	})
 
 	t.Run("lists entries by key less than or equal", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
@@ -242,7 +242,7 @@ func TestEntries(t *testing.T) {
 	})
 
 	t.Run("lists entries by key greater than and less than or equal to", func(t *testing.T) {
-		rb0, err := shard.EncodeBlock(shard.NewRoot(nil))
+		rb0, err := shard.MarshalBlock(shard.NewRoot(nil))
 		require.NoError(t, err)
 
 		bs := testutil.NewBlockstore()
