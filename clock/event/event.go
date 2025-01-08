@@ -13,6 +13,7 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-pail/block"
+	"github.com/storacha/go-pail/ipld/node"
 )
 
 type event[T any] struct {
@@ -33,7 +34,7 @@ func NewEvent[T any](data T, parents []ipld.Link) Event[T] {
 }
 
 // Unmarshal deserializes CBOR encoded bytes to an [Event].
-func Unmarshal[T any](b []byte, dataBinder NodeBinder[T]) (Event[T], error) {
+func Unmarshal[T any](b []byte, dataBinder node.Binder[T]) (Event[T], error) {
 	var e event[T]
 
 	np := basicnode.Prototype.Map
@@ -83,7 +84,7 @@ func Unmarshal[T any](b []byte, dataBinder NodeBinder[T]) (Event[T], error) {
 }
 
 // Marshal serializes an [Event] to CBOR encoded bytes.
-func Marshal[T any](event Event[T], dataUnbinder NodeUnbinder[T]) ([]byte, error) {
+func Marshal[T any](event Event[T], dataUnbinder node.Unbinder[T]) ([]byte, error) {
 	np := basicnode.Prototype.Any
 	nb := np.NewBuilder()
 
@@ -151,7 +152,7 @@ func Marshal[T any](event Event[T], dataUnbinder NodeUnbinder[T]) ([]byte, error
 
 // MarshalBlock serializes the [Event] to CBOR encoded bytes, takes the sha2-256
 // hash of the data, constructs a CID and returns a [block.Block].
-func MarshalBlock[T any](e Event[T], dataUnbinder NodeUnbinder[T]) (block.BlockView[Event[T]], error) {
+func MarshalBlock[T any](e Event[T], dataUnbinder node.Unbinder[T]) (block.BlockView[Event[T]], error) {
 	bytes, err := Marshal(e, dataUnbinder)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling event: %w", err)

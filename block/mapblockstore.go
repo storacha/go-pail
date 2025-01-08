@@ -8,11 +8,11 @@ import (
 
 // MapBlockstore is a blockstore that is backed by an in memory map.
 type MapBlockstore struct {
-	data map[string]Block
+	data map[ipld.Link]Block
 }
 
 func (bs *MapBlockstore) Get(ctx context.Context, link ipld.Link) (Block, error) {
-	b, ok := bs.data[link.String()]
+	b, ok := bs.data[link]
 	if !ok {
 		return nil, ErrNotFound
 	}
@@ -20,16 +20,16 @@ func (bs *MapBlockstore) Get(ctx context.Context, link ipld.Link) (Block, error)
 }
 
 func (bs *MapBlockstore) Put(ctx context.Context, b Block) error {
-	bs.data[b.Link().String()] = b
+	bs.data[b.Link()] = b
 	return nil
 }
 
 func (bs *MapBlockstore) Del(ctx context.Context, link ipld.Link) error {
-	delete(bs.data, link.String())
+	delete(bs.data, link)
 	return nil
 }
 
 // NewMapBlockstore creates a new blockstore that is backed by an in memory map.
 func NewMapBlockstore() *MapBlockstore {
-	return &MapBlockstore{map[string]Block{}}
+	return &MapBlockstore{map[ipld.Link]Block{}}
 }
