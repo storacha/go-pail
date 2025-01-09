@@ -6,7 +6,7 @@ import (
 	"github.com/ipld/go-ipld-prime"
 )
 
-var ErrNotFound = errors.New("not found")
+var ErrNotFound = errors.New("block not found")
 
 type block struct {
 	link  ipld.Link

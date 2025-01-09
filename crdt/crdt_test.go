@@ -31,6 +31,6 @@ func (p *testPail) Advance(ctx context.Context, event ipld.Link) {
 	require.NoError(p.t, err)
 	p.head = head
 
-	result, err := Root(p.blocks, head)
+	root, diff, err := Root(ctx, p.blocks, head)
 	require.NoError(p.t, err)
 }
