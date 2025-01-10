@@ -4,7 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
+	"maps"
 	"slices"
+	"sync"
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/storacha/go-pail"
@@ -90,6 +93,14 @@ func Root(ctx context.Context, blocks block.Fetcher, head []ipld.Link) (ipld.Lin
 		return nil, shard.Diff{}, fmt.Errorf("getting ancestor event: %w", err)
 	}
 
+	sorted, err := findSortedEvents(ctx, events, head, ancestor)
+	if err != nil {
+		return nil, shard.Diff{}, fmt.Errorf("finding sorted events: %w", err)
+	}
+
+	additions := map[ipld.Link]shard.BlockView{}
+	removals := map[ipld.Link]shard.BlockView{}
+
 	return nil, shard.Diff{}, errors.New("not implemented")
 }
 
@@ -166,4 +177,151 @@ func findCommonLink(arrays [][]ipld.Link) ipld.Link {
 		}
 	}
 	return nil
+}
+
+type weightedEvent struct {
+	event  event.BlockView[operation.Operation]
+	weight int64
+}
+
+// findSortedEvents finds and sorts events between the head(s) and the tail.
+func findSortedEvents(ctx context.Context, events *event.Fetcher[operation.Operation], head []ipld.Link, tail ipld.Link) ([]event.BlockView[operation.Operation], error) {
+	if len(head) == 1 && head[0] == tail {
+		return []event.BlockView[operation.Operation]{}, nil
+	}
+
+	// get weighted events - heavier events happened first
+	weights := map[ipld.Link]weightedEvent{}
+	for arr, err := range findAllEvents(ctx, events, head, tail, 0) {
+		if err != nil {
+			return nil, fmt.Errorf("finding events: %w", err)
+		}
+		for _, we := range arr {
+			if info, ok := weights[we.event.Link()]; ok {
+				info.weight += we.weight
+			} else {
+				weights[we.event.Link()] = we
+			}
+		}
+	}
+
+	// group events into buckets by weight
+	buckets := map[int64][]event.BlockView[operation.Operation]{}
+	for _, we := range weights {
+		if bucket, ok := buckets[we.weight]; ok {
+			buckets[we.weight] = append(bucket, we.event)
+		} else {
+			buckets[we.weight] = []event.BlockView[operation.Operation]{we.event}
+		}
+	}
+
+	// sort by weight, and by CID within weight
+	sortedWeights := slices.Collect(maps.Keys(buckets))
+	slices.Sort(sortedWeights)
+	var sortedEvents []event.BlockView[operation.Operation]
+	for _, w := range sortedWeights {
+		wes := buckets[w]
+		slices.SortFunc(wes, func(a, b event.BlockView[operation.Operation]) int {
+			if a.Link().String() < b.Link().String() {
+				return -1
+			}
+			return 1
+		})
+		sortedEvents = append(sortedEvents, wes...)
+	}
+
+	return sortedEvents, nil
+}
+
+func findAllEvents(ctx context.Context, events *event.Fetcher[operation.Operation], head []ipld.Link, tail ipld.Link, depth int64) iter.Seq2[[]weightedEvent, error] {
+	return func(yield func([]weightedEvent, error) bool) {
+		var wg sync.WaitGroup
+		wg.Add(len(head))
+
+		var mutex sync.RWMutex
+		var stopped bool
+		cctx, cancel := context.WithCancel(ctx)
+		for _, h := range head {
+			go func() {
+				defer wg.Done()
+				var wevts []weightedEvent
+				for we, err := range findEvents(cctx, events, h, tail, depth+1) {
+					mutex.Lock()
+					if stopped {
+						mutex.Unlock()
+						return
+					}
+					if err != nil {
+						stopped = true
+						cancel() // cancel other fetches
+						mutex.Unlock()
+						return
+					}
+					mutex.Unlock()
+					wevts = append(wevts, we)
+				}
+
+				mutex.Lock()
+				if !yield(wevts, nil) {
+					stopped = true
+					mutex.Unlock()
+					return
+				}
+				mutex.Unlock()
+			}()
+		}
+		wg.Wait()
+	}
+}
+
+func findEvents(ctx context.Context, events *event.Fetcher[operation.Operation], head ipld.Link, tail ipld.Link, depth int64) iter.Seq2[weightedEvent, error] {
+	return func(yield func(weightedEvent, error) bool) {
+		event, err := events.Get(ctx, head)
+		if err != nil {
+			yield(weightedEvent{}, err)
+			return
+		}
+
+		if !yield(weightedEvent{event, depth}, nil) {
+			return
+		}
+
+		parents := event.Value().Parents()
+		if len(parents) == 1 && parents[0] == tail {
+			return
+		}
+
+		var wg sync.WaitGroup
+		wg.Add(len(parents))
+
+		var mutex sync.RWMutex
+		var stopped bool
+		cctx, cancel := context.WithCancel(ctx)
+		for _, p := range parents {
+			go func() {
+				defer wg.Done()
+				for we, err := range findEvents(cctx, events, p, tail, depth+1) {
+					mutex.Lock()
+					if stopped {
+						mutex.Unlock()
+						return
+					}
+					if err != nil {
+						stopped = true
+						yield(weightedEvent{}, err)
+						cancel() // cancel other fetches
+						mutex.Unlock()
+						return
+					}
+					if !yield(we, err) {
+						stopped = true
+						mutex.Unlock()
+						return
+					}
+					mutex.Unlock()
+				}
+			}()
+		}
+		wg.Wait()
+	}
 }
