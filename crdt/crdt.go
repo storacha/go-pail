@@ -262,6 +262,10 @@ func findAllEvents(ctx context.Context, events *event.Fetcher[operation.Operatio
 				}
 
 				mutex.Lock()
+				if stopped {
+					mutex.Unlock()
+					return
+				}
 				if !yield(wevts, nil) {
 					stopped = true
 					mutex.Unlock()
