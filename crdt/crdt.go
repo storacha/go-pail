@@ -92,6 +92,7 @@ func Root(ctx context.Context, blocks block.Fetcher, head []ipld.Link) (ipld.Lin
 	if err != nil {
 		return nil, shard.Diff{}, fmt.Errorf("getting ancestor event: %w", err)
 	}
+	root := aevent.Value().Data().Root()
 
 	sorted, err := findSortedEvents(ctx, events, head, ancestor)
 	if err != nil {
@@ -101,7 +102,48 @@ func Root(ctx context.Context, blocks block.Fetcher, head []ipld.Link) (ipld.Lin
 	additions := map[ipld.Link]shard.BlockView{}
 	removals := map[ipld.Link]shard.BlockView{}
 
-	return nil, shard.Diff{}, errors.New("not implemented")
+	for _, eblock := range sorted {
+		event := eblock.Value()
+
+		var diff shard.Diff
+		var err error
+		if event.Data().Type() == operation.TypePut {
+			root, diff, err = pail.Put(ctx, blocks, root, event.Data().Key(), event.Data().Value())
+			if err != nil {
+				return nil, shard.Diff{}, fmt.Errorf("putting to common ancestor: %w", err)
+			}
+		} else if event.Data().Type() == operation.TypeDel {
+			root, diff, err = pail.Del(ctx, blocks, root, event.Data().Key())
+			if err != nil {
+				return nil, shard.Diff{}, fmt.Errorf("deleting from common ancestor: %w", err)
+			}
+		} else {
+			return nil, shard.Diff{}, fmt.Errorf("unknown operation: %s", event.Data().Type())
+		}
+
+		for _, a := range diff.Additions {
+			mblocks.Put(ctx, a)
+			additions[a.Link()] = a
+		}
+		for _, r := range diff.Removals {
+			removals[r.Link()] = r
+		}
+	}
+
+	// filter blocks that were added _and_ removed
+	for k := range maps.Keys(removals) {
+		if _, ok := additions[k]; ok {
+			delete(additions, k)
+			delete(removals, k)
+		}
+	}
+
+	diff := shard.Diff{
+		Additions: slices.Collect(maps.Values(additions)),
+		Removals:  slices.Collect(maps.Values(removals)),
+	}
+
+	return root, diff, nil
 }
 
 // findCommonAncestor finds the common ancestor event of the passed children. A
@@ -118,7 +160,7 @@ func findCommonAncestor(ctx context.Context, events *event.Fetcher[operation.Ope
 	}
 	for {
 		var changed bool
-		for _, c := range candidates {
+		for i, c := range candidates {
 			candidate, err := findAncestorCandidate(ctx, events, c[len(c)-1])
 			if err != nil {
 				if errors.Is(err, ErrEventNotFound) {
@@ -128,7 +170,7 @@ func findCommonAncestor(ctx context.Context, events *event.Fetcher[operation.Ope
 			}
 
 			changed = true
-			c = append(c, candidate)
+			candidates[i] = append(c, candidate)
 
 			if ancestor := findCommonLink(candidates); ancestor != nil {
 				return ancestor, nil
@@ -275,6 +317,7 @@ func findAllEvents(ctx context.Context, events *event.Fetcher[operation.Operatio
 			}()
 		}
 		wg.Wait()
+		cancel()
 	}
 }
 
@@ -327,5 +370,6 @@ func findEvents(ctx context.Context, events *event.Fetcher[operation.Operation],
 			}()
 		}
 		wg.Wait()
+		cancel()
 	}
 }
