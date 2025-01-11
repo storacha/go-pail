@@ -35,10 +35,7 @@ func Put(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string
 			return Result{}, fmt.Errorf("marshalling shard: %w", err)
 		}
 
-		err = mblocks.Put(ctx, rblock)
-		if err != nil {
-			return Result{}, fmt.Errorf("putting root block: %w", err)
-		}
+		_ = mblocks.Put(ctx, rblock)
 
 		root, diff, err := pail.Put(ctx, blocks, rblock.Link(), key, value)
 		if err != nil {
@@ -59,7 +56,132 @@ func Put(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string
 		return Result{diff, root, head, eblock}, nil
 	}
 
+	root, diff, err := Root(ctx, blocks, head)
+	if err != nil {
+		return Result{}, fmt.Errorf("determining pail root: %w", err)
+	}
+
+	additions := map[ipld.Link]shard.BlockView{}
+	removals := map[ipld.Link]shard.BlockView{}
+
+	for _, a := range diff.Additions {
+		_ = mblocks.Put(ctx, a)
+		additions[a.Link()] = a
+	}
+	for _, r := range diff.Removals {
+		removals[r.Link()] = r
+	}
+
+	root, diff, err = pail.Put(ctx, blocks, root, key, value)
+	if err != nil {
+		return Result{}, fmt.Errorf("putting to pail: %w", err)
+	}
+
+	// if we didn't change the pail we're done
+	if len(diff.Additions) == 0 {
+		return Result{}, nil
+	}
+
+	for _, a := range diff.Additions {
+		_ = mblocks.Put(ctx, a)
+		additions[a.Link()] = a
+	}
+	for _, r := range diff.Removals {
+		removals[r.Link()] = r
+	}
+
+	data := operation.NewPut(root, key, value)
+	evt := event.NewEvent(data, head)
+	eblock, err := event.MarshalBlock(evt, node.UnbinderFunc[operation.Operation](operation.Unbind))
+	if err != nil {
+		return Result{}, fmt.Errorf("marshalling event block: %w", err)
+	}
+
+	_ = mblocks.Put(ctx, eblock)
+
+	head, err = clock.Advance(ctx, blocks, node.BinderFunc[operation.Operation](operation.Bind), head, eblock.Link())
+	if err != nil {
+		return Result{}, fmt.Errorf("advancing clock: %w", err)
+	}
+
+	// filter blocks that were added _and_ removed
+	for k := range maps.Keys(removals) {
+		if _, ok := additions[k]; ok {
+			delete(additions, k)
+			delete(removals, k)
+		}
+	}
+
+	return Result{
+		Diff: shard.Diff{
+			Additions: slices.Collect(maps.Values(additions)),
+			Removals:  slices.Collect(maps.Values(removals)),
+		},
+		Root:  root,
+		Head:  head,
+		Event: eblock,
+	}, nil
+}
+
+// Del deletes the value for the given key from the bucket. If the key is not
+// found no operation occurs.
+func Del(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string) (Result, error) {
 	return Result{}, errors.New("not implemented")
+}
+
+// Get the stored value for the given key from the bucket. If the key is not
+// found, [pail.ErrNotFound] is returned.
+func Get(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string) (ipld.Link, error) {
+	if len(head) == 0 {
+		return nil, pail.ErrNotFound
+	}
+
+	root, diff, err := Root(ctx, blocks, head)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(diff.Additions) > 0 {
+		mblocks := block.NewMapBlockstore()
+		for _, b := range diff.Additions {
+			_ = mblocks.Put(ctx, b)
+		}
+		blocks = block.NewTieredBlockFetcher(mblocks, blocks)
+	}
+
+	return pail.Get(ctx, blocks, root, key)
+}
+
+func Entries(ctx context.Context, blocks block.Fetcher, head []ipld.Link, opts ...pail.EntriesOption) iter.Seq2[pail.Entry, error] {
+	return func(yield func(pail.Entry, error) bool) {
+		if len(head) == 0 {
+			return
+		}
+
+		root, diff, err := Root(ctx, blocks, head)
+		if err != nil {
+			yield(pail.Entry{}, err)
+			return
+		}
+
+		if len(diff.Additions) > 0 {
+			mblocks := block.NewMapBlockstore()
+			for _, b := range diff.Additions {
+				_ = mblocks.Put(ctx, b)
+			}
+			blocks = block.NewTieredBlockFetcher(mblocks, blocks)
+		}
+
+		for e, err := range pail.Entries(ctx, blocks, root, opts...) {
+			if err != nil {
+				yield(pail.Entry{}, err)
+				return
+			}
+			if !yield(e, err) {
+				return
+			}
+		}
+	}
 }
 
 // Root determines the effective pail root given the current merkle clock head.
@@ -122,7 +244,7 @@ func Root(ctx context.Context, blocks block.Fetcher, head []ipld.Link) (ipld.Lin
 		}
 
 		for _, a := range diff.Additions {
-			mblocks.Put(ctx, a)
+			_ = mblocks.Put(ctx, a)
 			additions[a.Link()] = a
 		}
 		for _, r := range diff.Removals {
