@@ -126,7 +126,74 @@ func Put(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string
 // Del deletes the value for the given key from the bucket. If the key is not
 // found no operation occurs.
 func Del(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string) (Result, error) {
-	return Result{}, errors.New("not implemented")
+	mblocks := block.NewMapBlockstore()
+	blocks = block.NewTieredBlockFetcher(mblocks, blocks)
+
+	root, diff, err := Root(ctx, blocks, head)
+	if err != nil {
+		return Result{}, fmt.Errorf("determining pail root: %w", err)
+	}
+
+	additions := map[ipld.Link]shard.BlockView{}
+	removals := map[ipld.Link]shard.BlockView{}
+
+	for _, a := range diff.Additions {
+		_ = mblocks.Put(ctx, a)
+		additions[a.Link()] = a
+	}
+	for _, r := range diff.Removals {
+		removals[r.Link()] = r
+	}
+
+	root, diff, err = pail.Del(ctx, blocks, root, key)
+	if err != nil {
+		return Result{}, fmt.Errorf("deleting from pail: %w", err)
+	}
+
+	// if we didn't change the pail we're done
+	if len(diff.Additions) == 0 {
+		return Result{}, nil
+	}
+
+	for _, a := range diff.Additions {
+		_ = mblocks.Put(ctx, a)
+		additions[a.Link()] = a
+	}
+	for _, r := range diff.Removals {
+		removals[r.Link()] = r
+	}
+
+	data := operation.NewDel(root, key)
+	evt := event.NewEvent(data, head)
+	eblock, err := event.MarshalBlock(evt, node.UnbinderFunc[operation.Operation](operation.Unbind))
+	if err != nil {
+		return Result{}, fmt.Errorf("marshalling event block: %w", err)
+	}
+
+	_ = mblocks.Put(ctx, eblock)
+
+	head, err = clock.Advance(ctx, blocks, node.BinderFunc[operation.Operation](operation.Bind), head, eblock.Link())
+	if err != nil {
+		return Result{}, fmt.Errorf("advancing clock: %w", err)
+	}
+
+	// filter blocks that were added _and_ removed
+	for k := range maps.Keys(removals) {
+		if _, ok := additions[k]; ok {
+			delete(additions, k)
+			delete(removals, k)
+		}
+	}
+
+	return Result{
+		Diff: shard.Diff{
+			Additions: slices.Collect(maps.Values(additions)),
+			Removals:  slices.Collect(maps.Values(removals)),
+		},
+		Root:  root,
+		Head:  head,
+		Event: eblock,
+	}, nil
 }
 
 // Get the stored value for the given key from the bucket. If the key is not
