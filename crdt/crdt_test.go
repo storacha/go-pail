@@ -13,10 +13,11 @@ import (
 	"github.com/storacha/go-pail/crdt/operation"
 	"github.com/storacha/go-pail/internal/testutil"
 	"github.com/storacha/go-pail/ipld/node"
+	"github.com/storacha/go-pail/shard"
 	"github.com/stretchr/testify/require"
 )
 
-func TestCRDT(t *testing.T) {
+func TestCRDTPut(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("put a value to a new clock", func(t *testing.T) {
@@ -176,6 +177,153 @@ func TestCRDT(t *testing.T) {
 
 		objs = slices.Collect(alice.Entries(ctx))
 		require.Equal(t, []pail.Entry{apple, data[0], data[1]}, objs)
+	})
+
+	t.Run("put same value to existing key", func(t *testing.T) {
+		bs := testutil.NewBlockstore()
+		alice := testPail{t: t, blocks: bs}
+
+		key := "key"
+		val := testutil.RandomLink(t)
+		r0 := alice.Put(ctx, key, val)
+
+		require.True(t, slices.ContainsFunc(r0.Additions, func(a shard.BlockView) bool {
+			return a.Link() == r0.Root
+		}))
+		require.False(t, slices.ContainsFunc(r0.Removals, func(a shard.BlockView) bool {
+			return a.Link() == r0.Root
+		}))
+
+		r1 := alice.Put(ctx, key, val)
+
+		// nothing was added or removed
+		require.Equal(t, r0.Root, r1.Root)
+		require.Len(t, r1.Additions, 0)
+		require.Len(t, r1.Removals, 0)
+
+		// no event should have been added to the clock
+		require.Equal(t, r0.Head, r1.Head)
+		require.Nil(t, r1.Event)
+	})
+}
+
+func TestCRDTDel(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("simple linear delete", func(t *testing.T) {
+		bs := testutil.NewBlockstore()
+		alice := testPail{t: t, blocks: bs}
+
+		apple := pail.Entry{Key: "apple", Value: testutil.RandomLink(t)}
+		alice.Put(ctx, apple.Key, apple.Value)
+
+		v0, err := alice.Get(ctx, apple.Key)
+		require.NoError(t, err)
+		require.Equal(t, apple.Value, v0)
+
+		r0 := alice.Del(ctx, apple.Key)
+		require.NotNil(t, r0.Event)
+		require.Equal(t, operation.TypeDel, r0.Event.Value().Data().Type())
+		require.Equal(t, apple.Key, r0.Event.Value().Data().Key())
+		require.Nil(t, r0.Event.Value().Data().Value())
+		require.Len(t, r0.Head, 1)
+		require.Equal(t, r0.Event.Link(), r0.Head[0])
+
+		_, err = alice.Get(ctx, apple.Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+	})
+
+	t.Run("remote delete", func(t *testing.T) {
+		bs := testutil.NewBlockstore()
+		alice := testPail{t: t, blocks: bs}
+
+		apple := pail.Entry{Key: "apple", Value: testutil.RandomLink(t)}
+
+		alice.Put(ctx, apple.Key, apple.Value)
+
+		bob := testPail{t: t, blocks: bs, head: alice.head}
+
+		res := alice.Del(ctx, apple.Key)
+
+		// alice no longer has this key
+		_, err := alice.Get(ctx, apple.Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+
+		// bob should still have this key
+		v0, err := bob.Get(ctx, apple.Key)
+		require.NoError(t, err)
+		require.Equal(t, apple.Value, v0)
+
+		bob.Advance(ctx, res.Event.Link())
+
+		// bob no longer has this key
+		_, err = bob.Get(ctx, apple.Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+	})
+
+	t.Run("simple parallel delete multiple values", func(t *testing.T) {
+		bs := testutil.NewBlockstore()
+		alice := testPail{t: t, blocks: bs}
+
+		data := []pail.Entry{
+			{Key: "apple", Value: testutil.RandomLink(t)},
+			{Key: "banana", Value: testutil.RandomLink(t)},
+			{Key: "kiwi", Value: testutil.RandomLink(t)},
+			{Key: "mango", Value: testutil.RandomLink(t)},
+			{Key: "orange", Value: testutil.RandomLink(t)},
+			{Key: "pear", Value: testutil.RandomLink(t)},
+		}
+
+		for _, e := range data {
+			alice.Put(ctx, e.Key, e.Value)
+		}
+
+		bob := testPail{t: t, blocks: bs, head: alice.head}
+		carol := testPail{t: t, blocks: bs, head: alice.head}
+
+		// bob deletes kiwi
+		br0 := bob.Del(ctx, data[2].Key)
+
+		// carol deletes pear
+		cr0 := carol.Del(ctx, data[5].Key)
+
+		// alice deletes banana
+		ar0 := alice.Del(ctx, data[1].Key)
+
+		alice.Advance(ctx, cr0.Event.Link())
+		alice.Advance(ctx, br0.Event.Link())
+
+		alice.Visualize(ctx)
+
+		_, err := alice.Get(ctx, data[2].Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+
+		_, err = alice.Get(ctx, data[5].Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+
+		_, err = alice.Get(ctx, data[1].Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+
+		bob.Advance(ctx, ar0.Event.Link())
+		bob.Advance(ctx, cr0.Event.Link())
+
+		_, err = bob.Get(ctx, data[2].Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+
+		_, err = bob.Get(ctx, data[5].Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
+
+		_, err = bob.Get(ctx, data[1].Key)
+		require.Error(t, err)
+		require.ErrorIs(t, err, pail.ErrNotFound)
 	})
 }
 

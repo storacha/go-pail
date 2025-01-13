@@ -39,13 +39,15 @@ func Unbind(op Operation) (ipld.Node, error) {
 		return nil, err
 	}
 
-	err = ma.AssembleKey().AssignString("value")
-	if err != nil {
-		return nil, err
-	}
-	err = ma.AssembleValue().AssignLink(op.Value())
-	if err != nil {
-		return nil, err
+	if op.Type() == TypePut {
+		err = ma.AssembleKey().AssignString("value")
+		if err != nil {
+			return nil, err
+		}
+		err = ma.AssembleValue().AssignLink(op.Value())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	err = ma.Finish()
@@ -89,15 +91,17 @@ func Bind(n ipld.Node) (Operation, error) {
 	}
 	op.key = k
 
-	vn, err := n.LookupByString("value")
-	if err != nil {
-		return nil, err
+	if op.typ == TypePut {
+		vn, err := n.LookupByString("value")
+		if err != nil {
+			return nil, err
+		}
+		v, err := vn.AsLink()
+		if err != nil {
+			return nil, err
+		}
+		op.val = v
 	}
-	v, err := vn.AsLink()
-	if err != nil {
-		return nil, err
-	}
-	op.val = v
 
 	return op, nil
 }

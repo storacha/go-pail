@@ -79,7 +79,7 @@ func Put(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string
 
 	// if we didn't change the pail we're done
 	if len(diff.Additions) == 0 {
-		return Result{}, nil
+		return Result{Diff: shard.Diff{}, Root: root, Head: head}, nil
 	}
 
 	for _, a := range diff.Additions {
@@ -152,7 +152,7 @@ func Del(ctx context.Context, blocks block.Fetcher, head []ipld.Link, key string
 
 	// if we didn't change the pail we're done
 	if len(diff.Additions) == 0 {
-		return Result{}, nil
+		return Result{Diff: shard.Diff{}, Root: root, Head: head}, nil
 	}
 
 	for _, a := range diff.Additions {
