@@ -41,7 +41,7 @@ func TestBasicExample(t *testing.T) {
 	}
 
 	fmt.Println("Entries:")
-	for entry, _ := range Entries(ctx, blocks, root) {
+	for entry := range Entries(ctx, blocks, root) {
 		fmt.Printf("%s: %s\n", entry.Key, entry.Value)
 	}
 }

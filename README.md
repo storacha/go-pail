@@ -57,7 +57,7 @@ func main() {
   }
 
   fmt.Println("Entries:")
-  for entry, _ := range pail.Entries(ctx, blocks, root) {
+  for entry := range pail.Entries(ctx, blocks, root) {
     fmt.Printf("%s: %s\n", entry.Key, entry.Value)
   }
 }
