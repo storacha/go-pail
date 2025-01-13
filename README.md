@@ -61,6 +61,18 @@ func main() {
     fmt.Printf("%s: %s\n", entry.Key, entry.Value)
   }
 }
+
+// Output:
+//
+// Root: bafyreiesj77bspnvajezltkvavgngyve7pucqcx527s42jzmo66tdewg44
+// Putting room-guardian.jpg: bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy
+// Root: bafyreidijignftc2p2dgt32eu2d5ge24jo74xxbmcn4clxuvfd52wo6sve
+// Added blocks:
+// + bafyreidijignftc2p2dgt32eu2d5ge24jo74xxbmcn4clxuvfd52wo6sve
+// Removed blocks:
+// - bafyreiesj77bspnvajezltkvavgngyve7pucqcx527s42jzmo66tdewg44
+// Entries:
+// room-guardian.jpg: bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy
 ```
 
 ## Contributing
