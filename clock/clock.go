@@ -11,10 +11,11 @@ import (
 	"github.com/ipld/go-ipld-prime"
 	"github.com/storacha/go-pail/block"
 	"github.com/storacha/go-pail/clock/event"
+	"github.com/storacha/go-pail/ipld/node"
 )
 
 // Advance the clock by adding an event.
-func Advance[T any](ctx context.Context, blocks block.Fetcher, dataBinder event.NodeBinder[T], head []ipld.Link, evt ipld.Link) ([]ipld.Link, error) {
+func Advance[T any](ctx context.Context, blocks block.Fetcher, dataBinder node.Binder[T], head []ipld.Link, evt ipld.Link) ([]ipld.Link, error) {
 	events := event.NewFetcher(blocks, dataBinder)
 	headmap := map[ipld.Link]struct{}{}
 	for _, h := range head {
@@ -117,7 +118,7 @@ func contains[T any](ctx context.Context, events *event.Fetcher[T], a, b ipld.Li
 	return false, nil
 }
 
-func Visualize[T any](ctx context.Context, blocks block.Fetcher, dataBinder event.NodeBinder[T], head []ipld.Link) iter.Seq2[string, error] {
+func Visualize[T any](ctx context.Context, blocks block.Fetcher, dataBinder node.Binder[T], head []ipld.Link) iter.Seq2[string, error] {
 	events := event.NewFetcher(blocks, dataBinder)
 	return func(yield func(string, error) bool) {
 		if !yield("digraph clock {", nil) {

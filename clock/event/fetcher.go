@@ -5,11 +5,12 @@ import (
 
 	"github.com/ipld/go-ipld-prime"
 	"github.com/storacha/go-pail/block"
+	"github.com/storacha/go-pail/ipld/node"
 )
 
 type Fetcher[T any] struct {
 	blocks     block.Fetcher
-	dataBinder NodeBinder[T]
+	dataBinder node.Binder[T]
 }
 
 func (f *Fetcher[T]) Get(ctx context.Context, link ipld.Link) (BlockView[T], error) {
@@ -26,6 +27,6 @@ func (f *Fetcher[T]) Get(ctx context.Context, link ipld.Link) (BlockView[T], err
 	return block.NewBlockView(link, b.Bytes(), s), nil
 }
 
-func NewFetcher[T any](blocks block.Fetcher, dataBinder NodeBinder[T]) *Fetcher[T] {
+func NewFetcher[T any](blocks block.Fetcher, dataBinder node.Binder[T]) *Fetcher[T] {
 	return &Fetcher[T]{blocks, dataBinder}
 }

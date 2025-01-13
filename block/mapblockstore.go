@@ -2,17 +2,22 @@ package block
 
 import (
 	"context"
+	"sync"
 
 	"github.com/ipld/go-ipld-prime"
 )
 
 // MapBlockstore is a blockstore that is backed by an in memory map.
 type MapBlockstore struct {
-	data map[string]Block
+	data  map[ipld.Link]Block
+	mutex sync.RWMutex
 }
 
 func (bs *MapBlockstore) Get(ctx context.Context, link ipld.Link) (Block, error) {
-	b, ok := bs.data[link.String()]
+	bs.mutex.RLock()
+	defer bs.mutex.RUnlock()
+
+	b, ok := bs.data[link]
 	if !ok {
 		return nil, ErrNotFound
 	}
@@ -20,16 +25,20 @@ func (bs *MapBlockstore) Get(ctx context.Context, link ipld.Link) (Block, error)
 }
 
 func (bs *MapBlockstore) Put(ctx context.Context, b Block) error {
-	bs.data[b.Link().String()] = b
+	bs.mutex.Lock()
+	bs.data[b.Link()] = b
+	bs.mutex.Unlock()
 	return nil
 }
 
 func (bs *MapBlockstore) Del(ctx context.Context, link ipld.Link) error {
-	delete(bs.data, link.String())
+	bs.mutex.Lock()
+	delete(bs.data, link)
+	bs.mutex.Unlock()
 	return nil
 }
 
 // NewMapBlockstore creates a new blockstore that is backed by an in memory map.
 func NewMapBlockstore() *MapBlockstore {
-	return &MapBlockstore{map[string]Block{}}
+	return &MapBlockstore{map[ipld.Link]Block{}, sync.RWMutex{}}
 }
