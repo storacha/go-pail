@@ -17,6 +17,9 @@ go get github.com/storacha/go-pail
 package main
 
 import (
+  "context"
+  "fmt"
+
   "github.com/ipfs/go-cid"
   cidlink "github.com/ipld/go-ipld-prime/linking/cid"
   "github.com/storacha/go-pail"
@@ -37,7 +40,7 @@ func main() {
   key := "room-guardian.jpg"
   value := cidlink.Link{Cid: cid.MustParse("bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy")}
 
-  fmt.Printf("Putting %s: %s", key, value)
+  fmt.Printf("Putting %s: %s\n", key, value)
 
   root, diff, _ := pail.Put(ctx, blocks, rootBlock.Link(), key, value)
 
@@ -50,7 +53,7 @@ func main() {
   fmt.Println("Removed blocks:")
   for _, b := range diff.Removals {
     fmt.Printf("- %s\n", b.Link())
-    _ = blocks.Del(ctx, b)
+    _ = blocks.Del(ctx, b.Link())
   }
 
   fmt.Println("Entries:")
