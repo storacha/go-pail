@@ -14,6 +14,8 @@ type Result struct {
 	Root ipld.Link
 	// Head is the list of event CIDs at the head of the clock.
 	Head []ipld.Link
-	// Event is the clock event block created for the operation performed.
+	// Event is the clock event block created for the operation performed. This
+	// may be nil of no operation occurred, for example putting the same value to
+	// an existing key or deleting a key that does not exist.
 	Event block.BlockView[event.Event[operation.Operation]]
 }
