@@ -8,13 +8,12 @@ import (
 	"github.com/ipfs/go-cid"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/storacha/go-pail/block"
-	"github.com/storacha/go-pail/shard"
 )
 
 func TestBasicExample(t *testing.T) {
 	ctx := context.Background()
 
-	rootBlock, _ := shard.MarshalBlock(shard.NewRoot(nil))
+	rootBlock, _ := New()
 
 	blocks := block.NewMapBlockstore()
 	_ = blocks.Put(ctx, rootBlock)

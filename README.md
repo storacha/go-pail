@@ -24,13 +24,12 @@ import (
   cidlink "github.com/ipld/go-ipld-prime/linking/cid"
   "github.com/storacha/go-pail"
   "github.com/storacha/go-pail/block"
-  "github.com/storacha/go-pail/shard"
 )
 
 func main() {
   ctx := context.Background()
 
-  rootBlock, _ := shard.MarshalBlock(shard.NewRoot(nil))
+  rootBlock, _ := pail.New()
 
   blocks := block.NewMapBlockstore()
   _ = blocks.Put(ctx, rootBlock)
