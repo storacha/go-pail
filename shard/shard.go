@@ -12,9 +12,9 @@ import (
 	"github.com/ipld/go-ipld-prime/datamodel"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-pail/block"
+	"github.com/storacha/go-pail/ipld/multicodec"
 )
 
 // Entry is a single key/value entry within a shard.

@@ -10,9 +10,9 @@ import (
 	"github.com/ipld/go-ipld-prime/codec/dagcbor"
 	cidlink "github.com/ipld/go-ipld-prime/linking/cid"
 	"github.com/ipld/go-ipld-prime/node/basicnode"
-	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"github.com/storacha/go-pail/block"
+	"github.com/storacha/go-pail/ipld/multicodec"
 	"github.com/storacha/go-pail/ipld/node"
 )
 
