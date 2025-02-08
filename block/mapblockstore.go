@@ -2,6 +2,7 @@ package block
 
 import (
 	"context"
+	"iter"
 	"sync"
 
 	"github.com/ipld/go-ipld-prime"
@@ -36,6 +37,18 @@ func (bs *MapBlockstore) Del(ctx context.Context, link ipld.Link) error {
 	delete(bs.data, link)
 	bs.mutex.Unlock()
 	return nil
+}
+
+func (bs *MapBlockstore) Entries(ctx context.Context) iter.Seq2[Block, error] {
+	return func(yield func(Block, error) bool) {
+		bs.mutex.RLock()
+		defer bs.mutex.RUnlock()
+		for _, b := range bs.data {
+			if !yield(b, nil) {
+				return
+			}
+		}
+	}
 }
 
 // NewMapBlockstore creates a new blockstore that is backed by an in memory map.
